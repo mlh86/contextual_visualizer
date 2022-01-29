@@ -8,6 +8,8 @@ from PIL import Image, ImageDraw
 
 DAILY_BIRTHS = 385000
 DAILY_DEATHS = 165000
+S_TO_EO_DIAMETER_RATIO = 211.60 # Ratio of sun's diameter to earth's orbital diameter
+
 
 def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, title_count=None):
     # For proper scrolling, need to nest a canvas inside a frame inside an outer-canvas C (as frames don't have scrollbars)
@@ -80,6 +82,54 @@ def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, titl
     cwin.bind("<Control-s>", save_canvas_to_png)
 
 
+def draw_earth_sun_diagram():
+    cwin = tk.Toplevel(root)
+    C = tk.Canvas(cwin, name='c')
+    cframe = ttk.Frame(C, name='f')
+    canvas = tk.Canvas(cframe, name='canvas')
+    C.grid(row=0,column=0,sticky='nsew')
+    C.create_window(0,0, window=cframe, anchor='nw')
+    canvas.grid(row=0, column=0, sticky='nw')
+
+    orbital_diameter = round(8 * S_TO_EO_DIAMETER_RATIO)
+    orbital_radius = round(orbital_diameter/2)
+
+    canvas['width'] =  orbital_diameter + 8
+    canvas['height'] = orbital_diameter + 8
+
+    # We draw the image in parallel using PIL, without displaying it. Used for saving to PNG...
+    image = Image.new("RGB", (orbital_diameter+8, orbital_diameter+8), "white")
+    draw = ImageDraw.Draw(image)
+    canvas.image = image
+
+    canvas.create_oval(4, 4, 4+orbital_diameter, 4+orbital_diameter)
+    draw.ellipse([4, 4, 4+orbital_diameter, 4+orbital_diameter], outline="black")
+    canvas.create_oval(orbital_radius, orbital_radius, orbital_radius+8, orbital_radius+8, outline="orange",fill="red")
+    draw.ellipse([orbital_radius, orbital_radius, orbital_radius+8, orbital_radius+8], outline="orange",fill="red")
+
+    if orbital_diameter > 0.86*root.winfo_screenheight() or orbital_diameter > 0.96*root.winfo_screenwidth():
+        yscroller = ttk.Scrollbar(cwin, command=C.yview, orient='vertical')
+        xscroller = ttk.Scrollbar(cwin, command=C.xview, orient='horizontal')
+        C['xscrollcommand'] = xscroller.set
+        C['yscrollcommand'] = yscroller.set
+        yscroller.grid(row=0,column=1,sticky='nsw')
+        xscroller.grid(row=1,column=0,sticky='ewn')
+        if orbital_diameter > 0.96*root.winfo_screenwidth():
+            C['width'] = 0.96*root.winfo_screenwidth()
+        else:
+            C['width'] = orbital_diameter + 8
+        C['height'] = 0.86*root.winfo_screenheight()
+        C['scrollregion'] = (0, 0, orbital_diameter+8, orbital_diameter+8)
+        cwin.geometry('+%d+%d'%(5,5))
+    else:
+        C['width'] = orbital_diameter + 8
+        C['height'] = orbital_diameter + 8
+
+    cwin.resizable(False, False)
+    cwin.title("The Earth is an invisible speck in space, with a diameter < 1% of the Sun's")
+    cwin.bind("<Control-s>", save_canvas_to_png)
+
+
 def create_ratio_visualization(ratio, wintitle, subratio=None, title_count=None):
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
@@ -135,6 +185,8 @@ def create_spatial_visualizations():
     c_to_c_ratio = round(country_area / city_area)
     create_ratio_visualization(c_to_w_ratio, "Your City in Your Country and the World", subratio=c_to_c_ratio)
 
+    draw_earth_sun_diagram()
+
 
 def validate_form_and_create_spatial_visualizations(evt=None):
     error_msg = ""
@@ -159,10 +211,10 @@ def create_population_visualizations(evt=None):
         tk.messagebox.showwarning("Invalid Selection", "Please select at least one visualization checkbox")
     if show_births.get():
         create_ratio_visualization(DAILY_BIRTHS, "Births per day (and hr)",
-		                           DAILY_BIRTHS//24, " ~ " + str(DAILY_BIRTHS))
+                                   DAILY_BIRTHS//24, " ~ " + str(DAILY_BIRTHS))
     if show_deaths.get():
         create_ratio_visualization(DAILY_DEATHS, "Deaths per day (and hr)",
-		                           DAILY_DEATHS//24, " ~ " + str(DAILY_DEATHS))
+                                   DAILY_DEATHS//24, " ~ " + str(DAILY_DEATHS))
 
 #######################################################################################################################
 
