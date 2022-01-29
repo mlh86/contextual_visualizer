@@ -1,12 +1,15 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as tkfd
-from PIL import Image, ImageDraw
-
 import ctypes
 import os
 
-def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0):
+from PIL import Image, ImageDraw
+
+DAILY_BIRTHS = 385000
+DAILY_DEATHS = 165000
+
+def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, title_count=None):
     # For proper scrolling, need to nest a canvas inside a frame inside an outer-canvas C (as frames don't have scrollbars)
     cwin = tk.Toplevel(root)
     C = tk.Canvas(cwin, name='c')
@@ -26,9 +29,11 @@ def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0):
     C.create_window(0,0, window=cframe, anchor='nw')
     canvas.grid(row=0, column=0, sticky='nw')
 
+    if not title_count:
+        title_count = " - 1 in " + "{0:,}".format(width*height)
     cwin.columnconfigure(0, weight=1)
     cwin.rowconfigure(0, weight=1)
-    cwin.title(wintitle + " - 1 in " + "{0:,}".format(width*height))
+    cwin.title(wintitle + title_count)
     cwin['bg'] = "#dddddd"
 
     C['bg'] = "black"
@@ -75,7 +80,7 @@ def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0):
     cwin.bind("<Control-s>", save_canvas_to_png)
 
 
-def create_ratio_visualization(ratio, wintitle, subratio=None):
+def create_ratio_visualization(ratio, wintitle, subratio=None, title_count=None):
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     aspect_ratio = screen_width / screen_height
@@ -83,8 +88,30 @@ def create_ratio_visualization(ratio, wintitle, subratio=None):
     gridwidth = round(aspect_ratio*gridheight)
     use_scrollers = True if gridheight > 0.86*screen_height else False
     inset_width = round(subratio**0.5) if subratio else 0
-    draw_canvas_grid(gridwidth, gridheight, use_scrollers, wintitle, inset_width)
+    draw_canvas_grid(gridwidth, gridheight, use_scrollers, wintitle, inset_width, title_count)
 
+
+def save_canvas_to_png(evt=None):
+    cwin = evt.widget
+    canvas = cwin.nametowidget(str(cwin) + ".c.f.canvas")
+    filepath = tkfd.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files","*.png")])
+    if not filepath:
+        return
+    temp_tk = tk.Toplevel(root)
+    temp_tk.title("Saving file...")
+    temp_tk.geometry("")
+    temp_pb = ttk.Progressbar(temp_tk)
+    temp_pb.pack()
+    temp_tk.transient(root)
+    temp_tk.geometry("+%d+%d" % (400, 200))
+    temp_pb.step(20)
+    root.update()
+    canvas.image.save(filepath)
+    temp_pb.step(60)
+    root.update()
+    temp_tk.destroy()
+
+##############################################################################################
 
 def create_spatial_visualizations():
     house_area = float(entry_HA.get())
@@ -127,27 +154,17 @@ def validate_form_and_create_spatial_visualizations(evt=None):
         create_spatial_visualizations()
 
 
-def save_canvas_to_png(evt=None):
-    cwin = evt.widget
-    canvas = cwin.nametowidget(str(cwin) + ".c.f.canvas")
-    filepath = tkfd.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files","*.png")])
-    if not filepath:
-        return
-    temp_tk = tk.Toplevel(root)
-    temp_tk.title("Saving file...")
-    temp_tk.geometry("")
-    temp_pb = ttk.Progressbar(temp_tk)
-    temp_pb.pack()
-    temp_tk.transient(root)
-    temp_tk.geometry("+%d+%d" % (400, 200))
-    temp_pb.step(20)
-    root.update()
-    canvas.image.save(filepath)
-    temp_pb.step(60)
-    root.update()
-    temp_tk.destroy()
+def create_population_visualizations(evt=None):
+    if not show_births.get() and not show_deaths.get():
+        tk.messagebox.showwarning("Invalid Selection", "Please select at least one visualization checkbox")
+    if show_births.get():
+        create_ratio_visualization(DAILY_BIRTHS, "Births per day (and hr)",
+		                           DAILY_BIRTHS//24, " ~ " + str(DAILY_BIRTHS))
+    if show_deaths.get():
+        create_ratio_visualization(DAILY_DEATHS, "Deaths per day (and hr)",
+		                           DAILY_DEATHS//24, " ~ " + str(DAILY_DEATHS))
 
-#############################################################################################
+#######################################################################################################################
 
 if os.name == 'nt':
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
@@ -166,6 +183,23 @@ FS = ttk.Frame(N, padding=10)
 FP = ttk.Frame(N, padding=10)
 N.add(FS, text=" Space ")
 N.add(FP, text=' Population ')
+
+# -----------------POPULATION-PANE-----------------
+
+show_births = tk.BooleanVar()
+checkbutton_BIRTHS = ttk.Checkbutton(FP, text="No. of people born each day", variable=show_births)
+
+show_deaths = tk.BooleanVar()
+checkbutton_DEATHS = ttk.Checkbutton(FP, text="No. of people who die each day", variable=show_deaths)
+
+pop_vis_button = ttk.Button(FP, text="Visualize", command=create_population_visualizations)
+pop_vis_button.bind("<Return>", create_population_visualizations)
+
+checkbutton_BIRTHS.grid(row=0, column=0, sticky=tk.W)
+checkbutton_DEATHS.grid(row=1, column=0, sticky=tk.W)
+pop_vis_button.grid(row=2, column=0, sticky=tk.E, pady=10)
+
+# ------------------SPATIAL-PANE-------------------
 
 label_HA = ttk.Label(FS, text="House Area ")
 label_CA = ttk.Label(FS, text="City Area ")
