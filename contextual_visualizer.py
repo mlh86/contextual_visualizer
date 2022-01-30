@@ -1,3 +1,34 @@
+"""
+contextual_visualizer -- An app that puts things in perspective
+
+This little app offers spatial and population-based visualizations
+to help the user get to grips with his or her place in the universe.
+
+On the spatial side, you enter your house-area, your city's area and
+your country-name, and it shows you three levels of perspective:
+- how big your city would be if your house was shrunk to 1 pixel
+- how big the world & your country would be if your city was shrunk to 1 pixel
+- how big earth's orbit is compared to the size of the sun and the earth
+
+On the population side, it shows you the number of people born every hour and
+every day, as well as the number of deaths per hour and per day.
+
+Copyright (C) 2022  Mohammad L. Hussain
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as tkfd
@@ -12,7 +43,15 @@ S_TO_EO_DIAMETER_RATIO = 211.60 # Ratio of sun's diameter to earth's orbital dia
 
 
 def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, title_count=None):
-    # For proper scrolling, need to nest a canvas inside a frame inside an outer-canvas C (as frames don't have scrollbars)
+    """
+    This is the workhorse function that takes a width and a height and draws a corresponding
+    grid using tk.Canvas. The grid is also drawn in-memory using PIL's ImageDraw module in
+    order to be able to save the image to PNG with high fidelity. Note that for proper scrolling,
+    I had to nest the actual canvas inside a frame inside an outer-canvas C. The scrollbars are
+    only created if the canvas-grid overflows the screen's dimensions (e.g. if it's greater than
+    0.86 of the screen's height)
+    """
+    # For proper scrolling, need to  (as frames don't have scrollbars)
     cwin = tk.Toplevel(root)
     C = tk.Canvas(cwin, name='c')
     cframe = ttk.Frame(C, name='f')
@@ -57,12 +96,11 @@ def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, titl
         canvas.create_line((0,i),(width,i), fill='black')
         draw.line([0,i,width,i],'black')
 
-    if inset_width:
-        inset_height = inset_width
+    if inset_width: # inset_height == inset_width
         for i in range(0, inset_width, 2):
-            canvas.create_line((i,0),(i,inset_height), fill='green')
-            draw.line([i,0,i,inset_height], 'green')
-        for i in range(0, inset_height, 2):
+            canvas.create_line((i,0),(i,inset_width), fill='green')
+            draw.line([i,0,i,inset_width], 'green')
+        for i in range(0, inset_width, 2):
             canvas.create_line((0,i),(inset_width,i), fill='green')
             draw.line([0,i,inset_width,i], 'green')
 
@@ -83,6 +121,12 @@ def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, titl
 
 
 def draw_earth_sun_diagram():
+    """
+    This is a variant of the function above that draws earth's orbit around the sun
+    instead of a pixel-grid. The basic canvas-level logic is the same, but it uses
+    create_oval instead of create_line. The image is again drawn in parallel using
+    both tk.Canvas and PIL's ImageDraw so as to allow proper saving to PNG.
+    """
     cwin = tk.Toplevel(root)
     C = tk.Canvas(cwin, name='c')
     cframe = ttk.Frame(C, name='f')
@@ -104,8 +148,10 @@ def draw_earth_sun_diagram():
 
     canvas.create_oval(4, 4, 4+orbital_diameter, 4+orbital_diameter)
     draw.ellipse([4, 4, 4+orbital_diameter, 4+orbital_diameter], outline="black")
-    canvas.create_oval(orbital_radius, orbital_radius, orbital_radius+8, orbital_radius+8, outline="orange",fill="red")
-    draw.ellipse([orbital_radius, orbital_radius, orbital_radius+8, orbital_radius+8], outline="orange",fill="red")
+    canvas.create_oval(orbital_radius, orbital_radius, orbital_radius+8, orbital_radius+8,
+                       outline="orange",fill="red")
+    draw.ellipse([orbital_radius, orbital_radius, orbital_radius+8, orbital_radius+8],
+                 outline="orange",fill="red")
 
     if orbital_diameter > 0.86*root.winfo_screenheight() or orbital_diameter > 0.96*root.winfo_screenwidth():
         yscroller = ttk.Scrollbar(cwin, command=C.yview, orient='vertical')
@@ -131,6 +177,12 @@ def draw_earth_sun_diagram():
 
 
 def create_ratio_visualization(ratio, wintitle, subratio=None, title_count=None):
+    """
+    A helper function that takes in a ratio and a sub-ratio, as well as a window title,
+    and calls the workhorse function above to draw appropriately sized pixel-grids. You
+    basically pass in a ratio-number such as 300,000 and it auto-creates a grid containing
+    roughly that many pixels, making best-use of the screen's aspect ratio.
+    """
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     aspect_ratio = screen_width / screen_height
@@ -142,6 +194,10 @@ def create_ratio_visualization(ratio, wintitle, subratio=None, title_count=None)
 
 
 def save_canvas_to_png(evt=None):
+    """
+    This function takes the in-memory image drawn using PIL's ImageDraw module and saves it
+    as a PNG file using the filepath selected by the user via the save-file-as dialog.
+    """
     cwin = evt.widget
     canvas = cwin.nametowidget(str(cwin) + ".c.f.canvas")
     filepath = tkfd.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files","*.png")])
@@ -164,6 +220,12 @@ def save_canvas_to_png(evt=None):
 ##############################################################################################
 
 def create_spatial_visualizations():
+    """
+    This function takes the area-values entered by the user and calls the
+    create_ratio_visualization function with appropriate ratio-parameters.
+    It also calls the draw_earth_sun_diagram function, resulting in
+    3 new top-level windows being created.
+    """
     house_area = float(entry_HA.get())
     if ha_unit.get() == 'sq. feet':
         house_area *= 0.092903
@@ -183,23 +245,29 @@ def create_spatial_visualizations():
 
     c_to_w_ratio = round(world_area / city_area)
     c_to_c_ratio = round(country_area / city_area)
-    create_ratio_visualization(c_to_w_ratio, "Your City in Your Country and the World", subratio=c_to_c_ratio)
+    create_ratio_visualization(c_to_w_ratio, "Your City in Your Country and the World",
+                               subratio=c_to_c_ratio)
 
     draw_earth_sun_diagram()
 
 
 def validate_form_and_create_spatial_visualizations(evt=None):
+    """
+    Performs basic validation of the user's spatial area inputs.
+    It shows a warning prompt if the inputs are invalid, and calls
+    the create_spatial_visualization function otherwise.
+    """
     error_msg = ""
     try:
-        f1 = float(entry_HA.get())
-        f2 = float(entry_CA.get())
+        float1 = float(entry_HA.get())
+        float2 = float(entry_CA.get())
     except:
         error_msg = "Please enter numeric area values"
-    if not error_msg and (f1 <= 0 or f2 <= 0):
+    if not error_msg and (float1 <= 0 or float2 <= 0):
         error_msg = "Please enter positive area values"
     if not error_msg and combobox_COUNTRY.get() not in countries_list:
         error_msg = "Please select a country-name from the dropdown list"
-    
+
     if error_msg:
         tk.messagebox.showwarning("Invalid Input", error_msg)
     else:
@@ -207,8 +275,14 @@ def validate_form_and_create_spatial_visualizations(evt=None):
 
 
 def create_population_visualizations(evt=None):
+    """
+    This function validates the user's population-pane checkbox selection
+    and calls the create_ratio_visualization function to display the
+    number of births and/or deaths per hour and per day.
+    """
     if not show_births.get() and not show_deaths.get():
-        tk.messagebox.showwarning("Invalid Selection", "Please select at least one visualization checkbox")
+        tk.messagebox.showwarning("Invalid Selection",
+                                  "Please select at least one visualization checkbox")
     if show_births.get():
         create_ratio_visualization(DAILY_BIRTHS, "Births per day (and hr)",
                                    DAILY_BIRTHS//24, " ~ " + str(DAILY_BIRTHS))
@@ -216,7 +290,9 @@ def create_population_visualizations(evt=None):
         create_ratio_visualization(DAILY_DEATHS, "Deaths per day (and hr)",
                                    DAILY_DEATHS//24, " ~ " + str(DAILY_DEATHS))
 
-#######################################################################################################################
+################################################################################################
+# The main GUI-creation code can be found below. It uses ttk.Notebook to create a 2-tab window,
+# one tab for spatial visualization and the other for population.
 
 if os.name == 'nt':
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
@@ -239,10 +315,10 @@ N.add(FP, text=' Population ')
 # -----------------POPULATION-PANE-----------------
 
 show_births = tk.BooleanVar()
-checkbutton_BIRTHS = ttk.Checkbutton(FP, text="No. of people born each day", variable=show_births)
+checkbutton_BIRTHS = ttk.Checkbutton(FP, text="No. of people born each day",variable=show_births)
 
 show_deaths = tk.BooleanVar()
-checkbutton_DEATHS = ttk.Checkbutton(FP, text="No. of people who die each day", variable=show_deaths)
+checkbutton_DEATHS = ttk.Checkbutton(FP, text="No. of people who die each day",variable=show_deaths)
 
 pop_vis_button = ttk.Button(FP, text="Visualize", command=create_population_visualizations)
 pop_vis_button.bind("<Return>", create_population_visualizations)
@@ -267,45 +343,63 @@ option_CA_unit = ttk.OptionMenu(FS, ca_unit, "sq. kms", "sq. kms", "sq. miles")
 option_CA_unit.configure(takefocus=0)
 
 country = tk.StringVar(FS)
-country_areas = {"Russia": 17098242, "Canada": 9984670, "China": 9706961, "United States": 9372610, "Brazil": 8515767, "Australia": 7692024,
-"India": 3287590, "Argentina": 2780400, "Kazakhstan": 2724900, "Algeria": 2381741, "DR Congo": 2344858, "Greenland": 2166086,
-"Saudi Arabia": 2149690, "Mexico": 1964375, "Indonesia": 1904569, "Sudan": 1886068, "Libya": 1759540, "Iran": 1648195, "Mongolia": 1564110,
-"Peru": 1285216, "Chad": 1284000, "Niger": 1267000, "Angola": 1246700, "Mali": 1240192, "South Africa": 1221037, "Colombia": 1141748,
-"Ethiopia": 1104300, "Bolivia": 1098581, "Mauritania": 1030700, "Egypt": 1002450, "Tanzania": 945087, "Nigeria": 923768, "Venezuela": 916445,
-"Pakistan": 881912, "Namibia": 825615, "Mozambique": 801590, "Turkey": 783562, "Chile": 756102, "Zambia": 752612, "Myanmar": 676578,
-"Afghanistan": 652230, "Somalia": 637657, "Central African Republic": 622984, "South Sudan": 619745, "Ukraine": 603500, "Madagascar": 587041,
-"Botswana": 582000, "Kenya": 580367, "France": 551695, "Yemen": 527968, "Thailand": 513120, "Spain": 505992, "Turkmenistan": 488100,
-"Cameroon": 475442, "Papua New Guinea": 462840, "Sweden": 450295, "Uzbekistan": 447400, "Morocco": 446550, "Iraq": 438317, "Paraguay": 406752,
-"Zimbabwe": 390757, "Japan": 377930, "Germany": 357114, "Philippines": 342353, "Congo": 342000, "Finland": 338424, "Vietnam": 331212,
-"Malaysia": 330803, "Norway": 323802, "Cote d'Ivoire": 322463, "Poland": 312679, "Oman": 309500, "Italy": 301336, "Ecuador": 276841,
-"Burkina Faso": 272967, "New Zealand": 270467, "Gabon": 267668, "Western Sahara": 266000, "Guinea": 245857, "United Kingdom": 242900,
-"Uganda": 241550, "Ghana": 238533, "Romania": 238391, "Laos": 236800, "Guyana": 214969, "Belarus": 207600, "Kyrgyzstan": 199951,
-"Senegal": 196722, "Syria": 185180, "Cambodia": 181035, "Uruguay": 181034, "Suriname": 163820, "Tunisia": 163610, "Bangladesh": 147570,
-"Nepal": 147181, "Tajikistan": 143100, "Greece": 131990, "Nicaragua": 130373, "North Korea": 120538, "Malawi": 118484, "Eritrea": 117600,
-"Benin": 112622, "Honduras": 112492, "Liberia": 111369, "Bulgaria": 110879, "Cuba": 109884, "Guatemala": 108889, "Iceland": 103000,
-"South Korea": 100210, "Hungary": 93028, "Portugal": 92090, "Jordan": 89342, "Serbia": 88361, "Azerbaijan": 86600, "Austria": 83871,
-"United Arab Emirates": 83600, "French Guiana": 83534, "Czechia": 78865, "Panama": 75417, "Sierra Leone": 71740, "Ireland": 70273,
-"Georgia": 69700, "Sri Lanka": 65610, "Lithuania": 65300, "Latvia": 64559, "Togo": 56785, "Croatia": 56594, "Bosnia and Herzegovina": 51209,
-"Costa Rica": 51100, "Slovakia": 49037, "Dominican Republic": 48671, "Estonia": 45227, "Denmark": 43094, "Netherlands": 41850,
-"Switzerland": 41284, "Bhutan": 38394, "Taiwan": 36193, "Guinea-Bissau": 36125, "Moldova": 33846, "Belgium": 30528, "Lesotho": 30355,
-"Armenia": 29743, "Solomon Islands": 28896, "Albania": 28748, "Equatorial Guinea": 28051, "Burundi": 27834, "Haiti": 27750, "Rwanda": 26338,
-"Republic of North Macedonia": 25713, "Djibouti": 23200, "Belize": 22966, "El Salvador": 21041, "Israel": 20770, "Slovenia": 20273,
-"New Caledonia": 18575, "Fiji": 18272, "Kuwait": 17818, "Eswatini": 17364, "Timor-Leste": 14874, "Bahamas": 13943, "Montenegro": 13812,
-"Vanuatu": 12189, "Falkland Islands": 12173, "Qatar": 11586, "Jamaica": 10991, "Gambia": 10689, "Lebanon": 10452, "Cyprus": 9251,
-"Puerto Rico": 8870, "State of Palestine": 6220, "Brunei Darussalam": 5765, "Trinidad and Tobago": 5130, "French Polynesia": 4167,
-"Cabo Verde": 4033, "Samoa": 2842, "Luxembourg": 2586, "Reunion": 2511, "Mauritius": 2040, "Comoros": 1862, "Guadeloupe": 1628,
-"Faeroe Islands": 1393, "Martinique": 1128, "Sao Tome and Principe": 964, "Turks and Caicos Islands": 948, "Kiribati": 811, "Bahrain": 765,
-"Dominica": 751, "Tonga": 747, "Singapore": 710, "Micronesia": 702, "Saint Lucia": 616, "Isle of Man": 572, "Guam": 549, "Andorra": 468,
-"Northern Mariana Islands": 464, "Palau": 459, "Seychelles": 452, "Curacao": 444, "Antigua and Barbuda": 442, "Barbados": 430,
-"Saint Helena": 394, "Saint Vincent and the Grenadines": 389, "Mayotte": 374, "United States Virgin Islands": 347, "Grenada": 344,
-"Caribbean Netherlands": 328, "Malta": 316, "Maldives": 300, "Cayman Islands": 264, "Saint Kitts and Nevis": 261, "Niue": 260,
-"Saint Pierre and Miquelon": 242, "Cook Islands": 236, "American Samoa": 199, "Marshall Islands": 181, "Aruba": 180, "Liechtenstein": 160,
-"British Virgin Islands": 151, "Wallis and Futuna Islands": 142, "Montserrat": 102, "Anguilla": 91, "San Marino": 61, "Bermuda": 54,
-"Saint Martin": 53, "Sint Maarten": 34, "Tuvalu": 26, "Nauru": 21, "Saint Barthelemy": 21, "Tokelau": 12, "Gibraltar": 6, "Monaco": 2}
+
+country_areas = {"Russia": 17098242, "Canada": 9984670, "China": 9706961, "United States": 9372610,
+"Brazil": 8515767, "Australia": 7692024, "India": 3287590, "Argentina": 2780400,
+"Kazakhstan": 2724900, "Algeria": 2381741, "DR Congo": 2344858, "Greenland": 2166086,
+"Saudi Arabia": 2149690, "Mexico": 1964375, "Indonesia": 1904569, "Sudan": 1886068,
+"Libya": 1759540, "Iran": 1648195, "Mongolia": 1564110, "Peru": 1285216, "Chad": 1284000,
+"Niger": 1267000, "Angola": 1246700, "Mali": 1240192, "South Africa": 1221037, "Colombia": 1141748,
+"Ethiopia": 1104300, "Bolivia": 1098581,"Mauritania": 1030700, "Egypt": 1002450, "Tanzania": 945087,
+"Nigeria": 923768, "Venezuela": 916445, "Pakistan": 881912, "Namibia": 825615, "Mozambique": 801590,
+"Turkey": 783562, "Chile": 756102, "Zambia": 752612, "Myanmar": 676578, "Afghanistan": 652230,
+"Somalia": 637657, "Central African Republic": 622984, "South Sudan": 619745, "Ukraine": 603500,
+"Madagascar": 587041, "Botswana": 582000, "Kenya": 580367, "France": 551695, "Yemen": 527968,
+"Thailand": 513120, "Spain": 505992, "Turkmenistan": 488100, "Cameroon": 475442,
+"Papua New Guinea": 462840, "Sweden": 450295, "Uzbekistan": 447400, "Morocco": 446550,
+"Iraq": 438317, "Paraguay": 406752, "Zimbabwe": 390757, "Japan": 377930, "Germany": 357114,
+"Philippines": 342353, "Congo": 342000, "Finland": 338424, "Vietnam": 331212,
+"Malaysia": 330803, "Norway": 323802, "Cote d'Ivoire": 322463, "Poland": 312679, "Oman": 309500,
+"Italy": 301336, "Ecuador": 276841, "Burkina Faso": 272967, "New Zealand": 270467, "Gabon": 267668,
+"Western Sahara": 266000, "Guinea": 245857, "United Kingdom": 242900, "Uganda": 241550,
+"Ghana": 238533, "Romania": 238391, "Laos": 236800, "Guyana": 214969, "Belarus": 207600,
+"Kyrgyzstan": 199951, "Senegal": 196722, "Syria": 185180, "Cambodia": 181035, "Uruguay": 181034,
+"Suriname": 163820, "Tunisia": 163610, "Bangladesh": 147570, "Nepal": 147181, "Tajikistan": 143100,
+"Greece": 131990, "Nicaragua": 130373, "North Korea": 120538, "Malawi": 118484, "Eritrea": 117600,
+"Benin": 112622, "Honduras": 112492, "Liberia": 111369, "Bulgaria": 110879, "Cuba": 109884,
+"Guatemala": 108889, "Iceland": 103000, "South Korea": 100210, "Hungary": 93028, "Portugal": 92090,
+"Jordan": 89342, "Serbia": 88361, "Azerbaijan": 86600, "Austria": 83871,
+"United Arab Emirates": 83600, "French Guiana": 83534, "Czechia": 78865, "Panama": 75417,
+"Sierra Leone": 71740, "Ireland": 70273, "Georgia": 69700, "Sri Lanka": 65610, "Lithuania": 65300,
+"Latvia": 64559, "Togo": 56785, "Croatia": 56594, "Bosnia and Herzegovina": 51209,
+"Costa Rica": 51100, "Slovakia": 49037, "Dominican Republic": 48671, "Estonia": 45227,
+"Denmark": 43094, "Netherlands": 41850, "Switzerland": 41284, "Bhutan": 38394, "Taiwan": 36193,
+"Guinea-Bissau": 36125, "Moldova": 33846, "Belgium": 30528, "Lesotho": 30355, "Armenia": 29743,
+"Solomon Islands": 28896, "Albania": 28748, "Equatorial Guinea": 28051, "Burundi": 27834,
+"Haiti": 27750, "Rwanda": 26338, "Republic of North Macedonia": 25713, "Djibouti": 23200,
+"Belize": 22966, "El Salvador": 21041, "Israel": 20770, "Slovenia": 20273, "New Caledonia": 18575,
+"Fiji": 18272, "Kuwait": 17818, "Eswatini": 17364, "Timor-Leste": 14874, "Bahamas": 13943,
+"Montenegro": 13812, "Vanuatu": 12189, "Falkland Islands": 12173, "Qatar": 11586, "Jamaica": 10991,
+"Gambia": 10689, "Lebanon": 10452, "Cyprus": 9251, "Puerto Rico": 8870, "State of Palestine": 6220,
+"Brunei Darussalam": 5765, "Trinidad and Tobago": 5130,"French Polynesia": 4167, "Cabo Verde": 4033,
+"Samoa": 2842, "Luxembourg": 2586, "Reunion": 2511, "Mauritius": 2040, "Comoros": 1862,
+"Guadeloupe": 1628, "Faeroe Islands": 1393, "Martinique": 1128, "Sao Tome and Principe": 964,
+"Turks and Caicos Islands": 948, "Kiribati": 811, "Bahrain": 765, "Dominica": 751, "Tonga": 747,
+"Singapore": 710, "Micronesia": 702, "Saint Lucia": 616, "Isle of Man": 572, "Guam": 549,
+"Andorra": 468, "Northern Mariana Islands": 464, "Palau": 459, "Seychelles": 452, "Curacao": 444,
+"Antigua and Barbuda": 442, "Barbados": 430, "Saint Helena": 394,
+"Saint Vincent and the Grenadines": 389, "Mayotte": 374, "United States Virgin Islands": 347,
+"Grenada": 344, "Caribbean Netherlands": 328, "Malta": 316, "Maldives": 300, "Cayman Islands": 264,
+"Saint Kitts and Nevis": 261, "Niue": 260, "Saint Pierre and Miquelon": 242, "Cook Islands": 236,
+"American Samoa": 199, "Marshall Islands": 181, "Aruba": 180, "Liechtenstein": 160,
+"British Virgin Islands": 151, "Wallis and Futuna Islands": 142, "Montserrat": 102, "Anguilla": 91,
+"San Marino": 61, "Bermuda": 54, "Saint Martin": 53, "Sint Maarten": 34, "Tuvalu": 26, "Nauru": 21,
+"Saint Barthelemy": 21, "Tokelau": 12, "Gibraltar": 6, "Monaco": 2}
 
 countries_list = sorted(country_areas.keys())
 
 def filter_countries(event):
+    """Filter's the combobox's drop-down list entries based on what the user has entered"""
     value = event.widget.get()
     if value == '':
         event.widget['values'] = countries_list
@@ -316,7 +410,8 @@ combobox_COUNTRY = ttk.Combobox(FS, textvariable=country, values=countries_list)
 combobox_COUNTRY.bind('<KeyRelease>', filter_countries)
 label_COUNTRY = ttk.Label(FS, text="Country ")
 
-vis_button = ttk.Button(FS, text="Visualize", command=validate_form_and_create_spatial_visualizations)
+vis_button = ttk.Button(FS, text="Visualize",
+                        command=validate_form_and_create_spatial_visualizations)
 
 label_HA.grid(row=0, column=0, sticky=tk.E)
 entry_HA.grid(row=0, column=1)
