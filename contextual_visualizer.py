@@ -41,6 +41,16 @@ DAILY_BIRTHS = 385000
 DAILY_DEATHS = 165000
 S_TO_EO_DIAMETER_RATIO = 211.60 # Ratio of sun's diameter to earth's orbital diameter
 
+def _get_grid_pattern_string(color):
+    even_row_str = "{ "
+    odd_row_str = "{ "
+    for i in range(2):
+        even_row_str += f"{color} {color} " if i % 2 else "#ffffff #ffffff "
+        odd_row_str += "#ffffff #ffffff " if i % 2 else f"{color} {color} "
+    even_row_str += "} "
+    odd_row_str += "} "
+    return even_row_str + even_row_str + odd_row_str + odd_row_str
+
 
 def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, title_count=None):
     """
@@ -80,41 +90,46 @@ def draw_canvas_grid(width, height, use_scrollers, wintitle, inset_width=0, titl
     C['bg'] = "black"
     C['highlightthickness'] = 0
 
-    canvas['background'] = 'white'
-    canvas['width'] = width
-    canvas['height'] = height
+    canvas['background'] = '#000000'
+    canvas['width'] = width*2
+    canvas['height'] = height*2
+
+    # Draw the grid image on canvas, at double-scale...
+    canvas.img = tk.PhotoImage(width = width*2, height = height*2)
+    canvas.create_image((2, 2), image = canvas.img, state = "normal", anchor = tk.NW)
+
+    canvas.img.put(_get_grid_pattern_string("#000000"), to=(0, 0, width*2, height*2))
+    canvas.create_rectangle((2,2,3,3),outline="red",fill="red")
 
     # We draw the image in parallel using PIL, without displaying it. Used for saving to PNG...
-    image = Image.new("RGB", (width, height), "white")
-    draw = ImageDraw.Draw(image)
-    canvas.image = image
+    even_row_bytes = b""
+    odd_row_bytes = b""
+    for i in range(width):
+        even_row_bytes += b"\x00\x00\x00" if i % 2 else b"\xff\xff\xff"
+        odd_row_bytes += b"\xff\xff\xff" if i % 2 else b"\x00\x00\x00"
+    pixel_bytes = (even_row_bytes + odd_row_bytes) * ((height+1)//2)
 
-    for i in range(0, width, 2):
-        canvas.create_line((i,0),(i,height), fill='black')
-        draw.line([i,0,i,height],'black')
-    for i in range(0, height, 2):
-        canvas.create_line((0,i),(width,i), fill='black')
-        draw.line([0,i,width,i],'black')
+    pil_img = Image.frombytes("RGB", (width, height), pixel_bytes)
+    draw = ImageDraw.Draw(pil_img)
+    canvas.image = pil_img
 
     if inset_width: # inset_height == inset_width
+        canvas.img.put(_get_grid_pattern_string("green"), to=(0, 0, inset_width*2, inset_width*2))
         for i in range(0, inset_width, 2):
-            canvas.create_line((i,0),(i,inset_width), fill='green')
             draw.line([i,0,i,inset_width], 'green')
         for i in range(0, inset_width, 2):
-            canvas.create_line((0,i),(inset_width,i), fill='green')
             draw.line([0,i,inset_width,i], 'green')
 
     draw.line([1,1,1,1],'red')
-    canvas.create_line((1,1),(3,3),fill='red') # This seems to color one pixel only, as desired...??
 
     if use_scrollers:
         C['width'] = 0.86*root.winfo_screenwidth()
         C['height'] = 0.86*root.winfo_screenheight()
-        C['scrollregion'] = (0, 0, width, height)
+        C['scrollregion'] = (0, 0, width*2, height*2)
         cwin.geometry('+%d+%d'%(5,5))
     else:
-        C['width'] = width
-        C['height'] = height
+        C['width'] = width*2
+        C['height'] = height*2
         cwin.resizable(False, False)
 
     cwin.bind("<Control-s>", save_canvas_to_png)
@@ -188,7 +203,7 @@ def create_ratio_visualization(ratio, wintitle, subratio=None, title_count=None)
     aspect_ratio = screen_width / screen_height
     gridheight = round((ratio/aspect_ratio)**0.5)
     gridwidth = round(aspect_ratio*gridheight)
-    use_scrollers = True if gridheight > 0.86*screen_height else False
+    use_scrollers = True if gridheight > 0.45*screen_height else False
     inset_width = round(subratio**0.5) if subratio else 0
     draw_canvas_grid(gridwidth, gridheight, use_scrollers, wintitle, inset_width, title_count)
 
